@@ -1,238 +1,306 @@
-
 📕 ПОЛНЫЙ РЕГЛАМЕНТ РАЗРАБОТКИ EXTERAGRAM PLUGINS
- * МАНИФЕСТ И ПРАВИЛА ЖИЗНИ
-СОЗДАТЕЛЬ: @DegradationModules — это закон.
+1. МАНИФЕСТ И ПРАВИЛА ЖИЗНИ
+
+СОЗДАТЕЛЬ: @matelerr — это закон.
+
 МЕТАДАННЫЕ: Только plain strings. Никакой конкатенации (парсится через AST).
-id: 2-32 символа, латиница, _, -. Не менять при обновлении!
-version: Старт с 1.0.0.
-name: Суть без "Pro/Ultra/Max".
-description: "Без всяких Pro/Max/Fixed."
+
+__id__: 2-32 символа, латиница, _, -. Не менять при обновлении!
+
+__version__: Старт с 1.0.0.
+
+__name__: Суть без "Pro/Ultra/Max".
+
+__description__: "Без всяких Pro/Max/Fixed."
+
 ГЕОМЕТРИЯ: Только AndroidUtilities.dp(число). Забудь про пиксели.
+
 ЦВЕТА: Только Theme.getColor(key). Никаких HEX.
+
 ТИПЫ: Java строгая. Нужен Long? Пиши jclass("java.lang.Long")(value).
- * КРИТИЧЕСКИЙ ДЕБАГГЕР (гуи сделай в своем стиле.)
-   def show_error_ui(self, error_text):
-   def _ui_task():
-   try:
-   from client_utils import get_last_fragment
-   from ui.alert import AlertDialogBuilder
-   from android.content import Context, ClipData
-   from ui.bulletin import BulletinHelper
-   frag = get_last_fragment()
-   if not frag: return
-   act = frag.getParentActivity()
-   if not act: return
-   bld = AlertDialogBuilder(act)
-   bld.set_title("Plugin Error")
-   bld.set_message(str(error_text))
-   def copy_listener(builder, which):
-   try:
-   clipboard = act.getSystemService(Context.CLIPBOARD_SERVICE)
-   clip = ClipData.newPlainText("Error Log", str(error_text))
-   clipboard.setPrimaryClip(clip)
-   BulletinHelper.show_success("Log copied!", frag)
-   except: pass
-   bld.set_neutral_button("Copy Log", copy_listener)
-   bld.set_positive_button("Close", lambda b, w: b.dismiss())
-   bld.show()
-   except: pass
-   run_on_ui_thread(_ui_task)
- * ПОТОКИ (THREADING) — ЭТО БАЗА
+
+2. КРИТИЧЕСКИЙ ДЕБАГГЕР (гуи сделай в своем стиле.)
+def show_error_ui(self, error_text):
+    def _ui_task():
+        try:
+            from client_utils import get_last_fragment
+            from ui.alert import AlertDialogBuilder
+            from android.content import Context, ClipData
+            from ui.bulletin import BulletinHelper
+            frag = get_last_fragment()
+            if not frag: return
+            act = frag.getParentActivity()
+            if not act: return
+            bld = AlertDialogBuilder(act)
+            bld.set_title("Plugin Error")
+            bld.set_message(str(error_text))
+            def copy_listener(builder, which):
+                try:
+                    clipboard = act.getSystemService(Context.CLIPBOARD_SERVICE)
+                    clip = ClipData.newPlainText("Error Log", str(error_text))
+                    clipboard.setPrimaryClip(clip)
+                    BulletinHelper.show_success("Log copied!", frag)
+                except: pass
+            bld.set_neutral_button("Copy Log", copy_listener)
+            bld.set_positive_button("Close", lambda b, w: b.dismiss())
+            bld.show()
+        except: pass
+    run_on_ui_thread(_ui_task)
+
+3. ПОТОКИ (THREADING) — ЭТО БАЗА
+
 UI Thread (run_on_ui_thread): Диалоги, алерты, изменение View, Bulletins.
+
 Background (run_on_queue(PLUGINS_QUEUE)): API запросы, файлы, тяжелые циклы, БД.
+
 Network: requests — синхронная! Только в фоне, иначе фриз 5-10 сек и краш.
- * КОМПОНЕНТЫ НАСТРОЕК (SETTINGS)
+
+4. КОМПОНЕНТЫ НАСТРОЕК (SETTINGS)
+
 ЗАПРЕТ: Не добавляй subtext в компонент Text. Это вызовет TypeError.
+
 Switch, Selector, Input: Имеют subtext.
+
 Text: Имеет accent, red, on_click, create_sub_fragment.
+
 Access: self.get_setting("key", default), self.set_setting("key", val, reload_settings=True).
- * ХУКИ И РЕФЛЕКСИЯ (REFLECTION)
+
+5. ХУКИ И РЕФЛЕКСИЯ (REFLECTION)
+
 Hook types: MethodHook (before/after), MethodReplacement (полная замена).
+
 Survival: Если поле не найдено по имени — ищи ПО ТИПУ в цикле через getSuperclass().
+
 Filters: @hook_filters(HookFilter.ArgumentIsNull(0)) и т.д.
+
 TL Hooks: pre_request_hook, post_request_hook, on_update_hook.
- * СЛОВАРЬ КЛАССОВ И ПУТЕЙ (TMessagesProj)
+
+6. СЛОВАРЬ КЛАССОВ И ПУТЕЙ (TMessagesProj)
+
 LaunchActivity: Инициализация, ссылки.
+
 ChatActivity: Рендеринг чата.
+
 MessageObject: Воркер для сообщений.
+
 AndroidUtilities: Тонна полезного говна.
+
 MessagesController: Главный по запросам.
- * ПОЛНЫЙ СПИСОК TL-ОБЪЕКТОВ
- * ЭТАЛОННЫЙ ПРИМЕР: TEXT ANIMATION BASE
-   id = "text_anim_base"
-   name = "Text Animation Base"
-   author = "@matelerr"
-   version = "1.0.0"
+
+7. ПОЛНЫЙ СПИСОК TL-ОБЪЕКТОВ
+
+8. ЭТАЛОННЫЙ ПРИМЕР: TEXT ANIMATION BASE
+__id__ = "text_anim_base"
+__name__ = "Text Animation Base"
+__author__ = "@matelerr"
+__version__ = "1.0.0"
+
 import time, math
 from weakref import WeakKeyDictionary
 from base_plugin import BasePlugin, MethodHook
 from android_utils import run_on_ui_thread
 from hook_utils import find_class
 from java import jclass
+
 class AnimationState:
-def init(self):
-self.start_time = time.time()
-self.is_animating = False
+    def __init__(self):
+        self.start_time = time.time()
+        self.is_animating = False
+
 class DrawHook(MethodHook):
-def init(self, plugin):
-self.plugin = plugin
-def after_hooked_method(self, param):
-    view = param.thisObject
-    canvas = param.args[0]
-    state = self.plugin.get_state(view)
-    if self.plugin.get_setting("enabled", True):
-        view.invalidate() 
+    def __init__(self, plugin):
+        self.plugin = plugin
+
+    def after_hooked_method(self, param):
+        view = param.thisObject
+        canvas = param.args[0]
+        state = self.plugin.get_state(view)
+        if self.plugin.get_setting("enabled", True):
+            view.invalidate() 
 
 class Plugin(BasePlugin):
-def init(self):
-super().init()
-self._states = WeakKeyDictionary()
-self.cursor_field = None
-def get_state(self, view):
-    if view not in self._states:
-        self._states[view] = AnimationState()
-    return self._states[view]
+    def __init__(self):
+        super().__init__()
+        self._states = WeakKeyDictionary()
+        self.cursor_field = None
 
-def on_plugin_load(self)
-    target_name = "org.telegram.ui.Components.EditTextBoldCursor"
-    cls = find_class(target_name)
-    if cls:
-        curr = cls.getClass()
-        while curr and not self.cursor_field:
+    def get_state(self, view):
+        if view not in self._states:
+            self._states[view] = AnimationState()
+        return self._states[view]
+
+    def on_plugin_load(self):
+        target_name = "org.telegram.ui.Components.EditTextBoldCursor"
+        cls = find_class(target_name)
+        if cls:
+            curr = cls.getClass()
+            while curr and not self.cursor_field:
+                try:
+                    f = curr.getDeclaredField("cursorWidth")
+                    f.setAccessible(True)
+                    self.cursor_field = f
+                except: curr = curr.getSuperclass()
             try:
-                f = curr.getDeclaredField("cursorWidth")
-                f.setAccessible(True)
-                self.cursor_field = f
-            except: curr = curr.getSuperclass()
-        try:
-            canvas_cls = find_class("android.graphics.Canvas")
-            m_draw = cls.getClass().getDeclaredMethod("onDraw", canvas_cls.getClass())
-            self.add_hook_obj(self.hook_method(m_draw, DrawHook(self)))
-        except Exception as e: self.log(f"Hook error: {e}")
+                canvas_cls = find_class("android.graphics.Canvas")
+                m_draw = cls.getClass().getDeclaredMethod("onDraw", canvas_cls.getClass())
+                self.add_hook_obj(self.hook_method(m_draw, DrawHook(self)))
+            except Exception as e: self.log(f"Hook error: {e}")
 
-def create_settings(self):
-    from ui.settings import Header, Switch
-    return [
-        Header(text="Animation Settings"),
-        Switch(key="enabled", text="Enable Effect", default=True)
-    ]
+    def create_settings(self):
+        from ui.settings import Header, Switch
+        return [
+            Header(text="Animation Settings"),
+            Switch(key="enabled", text="Enable Effect", default=True)
+        ]
 
 ANR check: Нет тяжелых операций в UI?
 Compatibility: subtext в Text отсутствует?
 Stability: Метод show_error_ui готов?
 AST: Метаданные написаны без кавычек-в-кавычках и f-строк?
-ниже ВСЕ страницы мануала exteragram:
+
+ниже ВСЕ страницы мануала exteragram: 
 ИСПОЛЬЗУЙ ГУГЛ И ДАННЫЕ НИЖЕ ДЛЯ ПРОВЕРКИ СИГНАТУР МЕТОДОВ. ЕСЛИ РЕАЛИЗАЦИЯ НЕВОЗМОЖНА — ТАК И ГОВОРИ ЧЕРЕЗ EXTERAGRAM ПЛАГИН:
 Metadata
 Metadata should be defined as plain strings. No concatenation or formatting, since it's parsed using AST.
-name = "Better Previews"
-description = "Modifies specific URLs (Twitter, TikTok, Reddit, Instagram, Pixiv) for better previews"
-version = "1.0.0"
-id = "better_previews"
-author = "@immat0x1"
-icon = "exteraPlugins/1"
-min_version = "11.12.0"
-Required fields: id and name. The engine also validates min_version if it's present.
-id: Must be 2-32 characters long, start with a letter, and contain only latin letters, numbers, dashes (-) and underscores (_).
-author: Supports plain text names or Telegram usernames/channel links (e.g., @yourUsername or @yourPluginChannel). These may be displayed as clickable links in the UI.
-description: Supports basic markdown for formatting.
-version: If not defined, your plugin will have version 1.0 by default.
-icon: To fill this field, use the short name of a sticker pack followed by the index of the sticker, separated by a slash (/). The index starts from 0. For example, if your sticker pack's link is https://t.me/addstickers/MyPackName, its short name is MyPackName, and to use the second sticker you would write MyPackName/1.
+__name__ = "Better Previews"
+__description__ = "Modifies specific URLs (Twitter, TikTok, Reddit, Instagram, Pixiv) for better previews"
+__version__ = "1.0.0"
+__id__ = "better_previews"
+__author__ = "@immat0x1"
+__icon__ = "exteraPlugins/1"
+__min_version__ = "11.12.0"
+
+Required fields: __id__ and __name__. The engine also validates __min_version__ if it's present.
+
+__id__: Must be 2-32 characters long, start with a letter, and contain only latin letters, numbers, dashes (-) and underscores (_).
+
+__author__: Supports plain text names or Telegram usernames/channel links (e.g., @yourUsername or @yourPluginChannel). These may be displayed as clickable links in the UI.
+
+__description__: Supports basic markdown for formatting.
+
+__version__: If not defined, your plugin will have version 1.0 by default.
+
+__icon__: To fill this field, use the short name of a sticker pack followed by the index of the sticker, separated by a slash (/). The index starts from 0. For example, if your sticker pack's link is https://t.me/addstickers/MyPackName, its short name is MyPackName, and to use the second sticker you would write MyPackName/1.
+
+
 Settings
 You can create a settings screen for your plugin to allow users to configure its behavior. This is done by implementing the create_settings method in your plugin class.
+
 For detailed information on how to create settings, what UI components are available, and how to handle user input, please refer to the dedicated Plugin Settings page.
+
 Plugin events
 Load and unload
+
 class DebugPlugin(BasePlugin):
-def on_plugin_load(self):
-# e.g. register hooks, initialize resources
-self.log("Plugin loaded!")
-pass
-def on_pluanimagin_unload(self):
-    # e.g. unregister hooks, clean up resources
-    self.log("Plugin unloaded!")
-    pass
+    def on_plugin_load(self):
+        # e.g. register hooks, initialize resources
+        self.log("Plugin loaded!")
+        pass
+ 
+    def on_pluanimagin_unload(self):
+        # e.g. unregister hooks, clean up resources
+        self.log("Plugin unloaded!")
+        pass
 
 on_plugin_load occurs when user enables the plugin or on application startup.
 on_plugin_unload occurs when user disables the plugin or on application shutdown.
 Application events
+
 from base_plugin import AppEvent
+ 
 class DebugPlugin(BasePlugin):
-def on_app_event(self, event_type: AppEvent):
-if event_type == AppEvent.START:
-self.log("App is starting")
-elif event_type == AppEvent.STOP:
-self.log("App is stopping")
-elif event_type == AppEvent.PAUSE:
-self.log("App is being paused")
-elif event_type == AppEvent.RESUME:
-self.log("App is resuming")
+    def on_app_event(self, event_type: AppEvent):
+        if event_type == AppEvent.START:
+            self.log("App is starting")
+        elif event_type == AppEvent.STOP:
+            self.log("App is stopping")
+        elif event_type == AppEvent.PAUSE:
+            self.log("App is being paused")
+        elif event_type == AppEvent.RESUME:
+            self.log("App is resuming")
 The AppEvent enum provides the following events:
+
 START - Application is starting
 STOP - Application is stopping
 PAUSE - Application is paused (e.g., backgrounded)
 RESUME - Application is resumed (e.g., brought to foreground)
+
+
 You can add custom actions to various menus within the application, such as the context menu for messages or the action menu in a user's profile. This is done by adding a MenuItemData object.
+
+
 from base_plugin import BasePlugin, MenuItemData, MenuItemType
 from typing import Dict, Any
+ 
 class MyMenuPlugin(BasePlugin):
-def on_plugin_load(self):
-self.log("Adding custom menu items...")
-self.add_menu_item(
-MenuItemData(
-menu_type=MenuItemType.MESSAGE_CONTEXT_MENU,
-text="Log Message Info",
-on_click=self.handle_message_click,
-icon="msg_info" # Example icon
-)
-)
-self.add_menu_item(
-MenuItemData(
-menu_type=MenuItemType.PROFILE_ACTION_MENU,
-text="Log User Info",
-on_click=self.handle_profile_click,
-icon="user_search" # Example icon
-)
-)
-def on_plugin_unload(self):
-    # Menu items are removed automatically, no need for manual cleanup.
-    self.log("MyMenuPlugin unloaded.")
+    def on_plugin_load(self):
+        self.log("Adding custom menu items...")
+        self.add_menu_item(
+            MenuItemData(
+                menu_type=MenuItemType.MESSAGE_CONTEXT_MENU,
+                text="Log Message Info",
+                on_click=self.handle_message_click,
+                icon="msg_info" # Example icon
+            )
+        )
+        self.add_menu_item(
+            MenuItemData(
+                menu_type=MenuItemType.PROFILE_ACTION_MENU,
+                text="Log User Info",
+                on_click=self.handle_profile_click,
+                icon="user_search" # Example icon
+            )
+        )
+ 
+    def on_plugin_unload(self):
+        # Menu items are removed automatically, no need for manual cleanup.
+        self.log("MyMenuPlugin unloaded.")
+ 
+    def handle_message_click(self, context: Dict[str, Any]):
+        self.log(f"Message menu item clicked! Context keys: {list(context.keys())}")
+ 
+        message = context.get("message")
+        if message:
+            self.log(f"Clicked on message ID: {message.getId()} from user: {message.getSenderId()}")
+            self.log(f"Message text: {message.messageText}")
+ 
+    def handle_profile_click(self, context: Dict[str, Any]):
+        self.log(f"Profile menu item clicked! Context keys: {list(context.keys())}")
+ 
+        user = context.get("user")
+        if user:
+            self.log(f"Profile menu clicked for user: {user.first_name} (ID: {user.id})")
 
-def handle_message_click(self, context: Dict[str, Any]):
-    self.log(f"Message menu item clicked! Context keys: {list(context.keys())}")
-
-    message = context.get("message")
-    if message:
-        self.log(f"Clicked on message ID: {message.getId()} from user: {message.getSenderId()}")
-        self.log(f"Message text: {message.messageText}")
-
-def handle_profile_click(self, context: Dict[str, Any]):
-    self.log(f"Profile menu item clicked! Context keys: {list(context.keys())}")
-
-    user = context.get("user")
-    if user:
-        self.log(f"Profile menu clicked for user: {user.first_name} (ID: {user.id})")
 
 MenuItemData
 To add a menu item, you call self.add_menu_item() with a MenuItemData object, which has the following properties:
+
 menu_type: MenuItemType: Required. Specifies which menu to add the item to. The available types are:
 MenuItemType.MESSAGE_CONTEXT_MENU: Menu when pressing a message.
 MenuItemType.DRAWER_MENU: The main navigation drawer (hamburger menu).
 MenuItemType.CHAT_ACTION_MENU: The three-dot menu inside a chat screen.
 MenuItemType.PROFILE_ACTION_MENU: The three-dot menu on a user, bot, or channel profile screen.
 text: str: Required. The text displayed for the menu item.
+
+
 on_click: Callable[[Dict[str, Any]], None]: Required. A function that will be called when the user taps the item. It receives a dictionary containing context-specific data.
 item_id: str: Optional. A unique ID for this item. Useful if you need to remove it later with remove_menu_item(). If not provided, a unique ID is generated.
 icon: str: Optional. The name of a drawable resource to use as an icon for the item (e.g., "msg_info", "msg_delete").
 subtext: str: Optional. Additional text displayed below the main text.
 condition: str: Optional. A MVEL expression to conditionally show the item. (e.g., "message.isOut()").
 priority: int: Optional. A number to influence the item's position in the menu. Higher numbers appear first.
+
+
 The on_click Context
 The on_click callback receives a dictionary with data relevant to the context where the menu was opened. The available keys depend on the MenuItemType and the specific situation. For example, a message context menu will provide a message object, while a profile menu will provide a user object.
+
 It's best practice to check for the existence of a key before using it. You can log the dictionary's keys to discover what's available: self.log(f"Context keys: {list(context.keys())}").
+
 Here are some of the possible keys you might find in the context dictionary:
+
 account: int: The current user account instance number.
 context: android.content.Context: The Android application context.
+
 fragment: org.telegram.ui.ActionBar.BaseFragment: The current UI fragment.
 dialog_id: long: The dialog ID for the current chat.
 user: TLRPC.User: The User object (e.g., in a profile menu).
@@ -243,233 +311,276 @@ chatId: long: The ID of the chat.
 chatFull: TLRPC.ChatFull: The ChatFull object with more details.
 encryptedChat: TLRPC.EncryptedChat: The object for a secret chat.
 message: org.telegram.messenger.MessageObject: The MessageObject that was clicked on.
+
 groupedMessages: org.telegram.messenger.MessageObject.GroupedMessages: Information about grouped media (albums).
 botInfo: TL_bots.BotInfo: Information about a bot.
 Removing Menu Items
 If you provided a custom item_id when adding a menu item, you can remove it programmatically using self.remove_menu_item(item_id). However, in most cases, this is not necessary, as all of a plugin's menu items are automatically removed when the plugin is unloaded.
+
+
 self.remove_menu_item("my_unique_item_id")
+
 Hooks
 To intercept network requests, responses, or client-side events, you first need to register a hook.
+
 You can register hooks for specific Telegram API requests using their TL-schema name: self.add_hook("TL_messages_readHistory", match_substring: bool = False, priority: int = 0)
+
 name: The name of the event or request (e.g., "TL_messages_readHistory").
 match_substring: If True, the hook will trigger if name is a substring of the actual event/request name. Defaults to False.
 priority: Hooks with higher priority are executed first. Defaults to 0.
+
 Examples:
+
 self.add_hook("TL_messages_readHistory")
 self.add_hook("requestCall")
 self.add_hook("TL_channels_readHistory")
 The list of names for requests could be found here.
+
 For the common case of hooking message sending, you can use a helper: self.add_on_send_message_hook(priority: int = 0)
+
 API Request Hooks
 These hooks allow you to inspect or modify outgoing requests and incoming responses.
+
 Here is a practical example of a "Ghost Mode" plugin that blocks the "typing" status and forces the user to appear offline.
+
+
 from base_plugin import BasePlugin, HookResult, HookStrategy
 from ui.settings import Switch
 from typing import Any
-A list of request names that indicate the user is typing.
+ 
+# A list of request names that indicate the user is typing.
 TYPING_REQUESTS = ["TL_messages_setTyping", "TL_messages_setEncryptedTyping"]
+ 
 class GhostModePlugin(BasePlugin):
-def on_plugin_load(self):
-# Hook all typing-related requests
-for req_name in TYPING_REQUESTS:
-self.add_hook(req_name)
-    # Hook the request that updates the user's online status
-    self.add_hook("TL_account_updateStatus")
-
-def pre_request_hook(self, request_name: str, account: int, request: Any) -> HookResult:
-    # This method is called for every request we've hooked.
-
-    # 1. Block "typing..." status
-    if request_name in TYPING_REQUESTS:
-        if self.get_setting("dont_send_typing", True):
-            self.log(f"Blocking request: {request_name}")
-            # By returning CANCEL, we prevent the request from being sent.
-            return HookResult(strategy=HookStrategy.CANCEL)
-
-    # 2. Force offline status
-    if request_name == "TL_account_updateStatus":
-        if self.get_setting("force_offline", True):
-            self.log("Forcing offline status in TL_account_updateStatus request.")
-            # Modify the request object directly
-            request.offline = True
-            # Return MODIFY with the modified request object.
-            return HookResult(strategy=HookStrategy.MODIFY, request=request)
-
-    # For any other hooked requests we don't handle, do nothing.
-    return HookResult(strategy=HookStrategy.DEFAULT)
-
-def post_request_hook(self, request_name: str, account: int, response: Any, error: Any) -> HookResult:
-    # You can also intercept responses from the server.
-    # For example, you could log when a message is successfully sent.
-    if request_name == "TL_messages_sendMessage":
-        if not error:
-            self.log("Successfully sent a message!")
-    return HookResult(strategy=HookStrategy.DEFAULT)
-
-def create_settings(self) -> list:
-    return [
-        Switch(key="dont_send_typing", text="Don't send typing status", default=True),
-        Switch(key="force_offline", text="Always appear offline", default=True)
-    ]
+    def on_plugin_load(self):
+        # Hook all typing-related requests
+        for req_name in TYPING_REQUESTS:
+            self.add_hook(req_name)
+        
+        # Hook the request that updates the user's online status
+        self.add_hook("TL_account_updateStatus")
+ 
+    def pre_request_hook(self, request_name: str, account: int, request: Any) -> HookResult:
+        # This method is called for every request we've hooked.
+ 
+        # 1. Block "typing..." status
+        if request_name in TYPING_REQUESTS:
+            if self.get_setting("dont_send_typing", True):
+                self.log(f"Blocking request: {request_name}")
+                # By returning CANCEL, we prevent the request from being sent.
+                return HookResult(strategy=HookStrategy.CANCEL)
+ 
+        # 2. Force offline status
+        if request_name == "TL_account_updateStatus":
+            if self.get_setting("force_offline", True):
+                self.log("Forcing offline status in TL_account_updateStatus request.")
+                # Modify the request object directly
+                request.offline = True
+                # Return MODIFY with the modified request object.
+                return HookResult(strategy=HookStrategy.MODIFY, request=request)
+ 
+        # For any other hooked requests we don't handle, do nothing.
+        return HookResult(strategy=HookStrategy.DEFAULT)
+    
+    def post_request_hook(self, request_name: str, account: int, response: Any, error: Any) -> HookResult:
+        # You can also intercept responses from the server.
+        # For example, you could log when a message is successfully sent.
+        if request_name == "TL_messages_sendMessage":
+            if not error:
+                self.log("Successfully sent a message!")
+        return HookResult(strategy=HookStrategy.DEFAULT)
+ 
+    def create_settings(self) -> list:
+        return [
+            Switch(key="dont_send_typing", text="Don't send typing status", default=True),
+            Switch(key="force_offline", text="Always appear offline", default=True)
+        ]
 
 Hook results determine the action to take:
+
 HookStrategy.DEFAULT: No changes to the flow; proceed as normal.
 HookStrategy.CANCEL: Cancel the request (for pre_request_hook and on_send_message_hook) or suppress further processing of the response/update.
 HookStrategy.MODIFY: Modify the request (in pre_request_hook), response (in post_request_hook), update (in on_update_hook), updates (in on_updates_hook), or params (in on_send_message_hook). The modified object must be assigned to the corresponding field in the HookResult (e.g., result.request = modified_request).
 HookStrategy.MODIFY_FINAL: Same as MODIFY, but no other plugins hooks for this event will be called after this one.
+
 Update Hooks
 These hooks are called when the application processes updates received from Telegram.
+
+
 def on_update_hook(self, update_name: str, account: int, update: Any) -> HookResult:
-# Called when the app receives an individual update (e.g., TL_updateNewMessage)
-result = HookResult()
-if update_name == "TL_updateNewMessage":
-    self.log(f"Intercepted on_update_hook for {update_name}")
-    # Example: Process or modify the update
-    # if hasattr(update, 'message') and hasattr(update.message, 'message'):
-    #     if "secret" in update.message.message:
-    #         update.message.message = "[REDACTED]"
-    #         result.strategy = HookStrategy.MODIFY
-    #         result.update = update # Assign the modified update back
-    pass
-
-return result
-
+    # Called when the app receives an individual update (e.g., TL_updateNewMessage)
+    result = HookResult()
+ 
+    if update_name == "TL_updateNewMessage":
+        self.log(f"Intercepted on_update_hook for {update_name}")
+        # Example: Process or modify the update
+        # if hasattr(update, 'message') and hasattr(update.message, 'message'):
+        #     if "secret" in update.message.message:
+        #         update.message.message = "[REDACTED]"
+        #         result.strategy = HookStrategy.MODIFY
+        #         result.update = update # Assign the modified update back
+        pass
+ 
+    return result
+ 
 def on_updates_hook(self, container_name: str, account: int, updates: Any) -> HookResult:
-# Called when the app receives a container of updates (e.g., TL_updates, TL_updatesCombined)
-result = HookResult()
-if container_name == "TL_updates" and hasattr(updates, 'updates'):
-    self.log(f"Intercepted on_updates_hook for {container_name} with {len(updates.updates)} inner updates.")
-    # Example: Filter updates
-    # filtered_inner_updates = [upd for upd in updates.updates if not isinstance(upd, TLRPC.TL_updateUserStatus)]
-    # if len(filtered_inner_updates) < len(updates.updates):
-    #    updates.updates = ArrayList(filtered_inner_updates) # Assuming ArrayList is needed
-    #    result.strategy = HookStrategy.MODIFY
-    #    result.updates = updates # Assign the modified container back
-    pass
+    # Called when the app receives a container of updates (e.g., TL_updates, TL_updatesCombined)
+    result = HookResult()
+ 
+    if container_name == "TL_updates" and hasattr(updates, 'updates'):
+        self.log(f"Intercepted on_updates_hook for {container_name} with {len(updates.updates)} inner updates.")
+        # Example: Filter updates
+        # filtered_inner_updates = [upd for upd in updates.updates if not isinstance(upd, TLRPC.TL_updateUserStatus)]
+        # if len(filtered_inner_updates) < len(updates.updates):
+        #    updates.updates = ArrayList(filtered_inner_updates) # Assuming ArrayList is needed
+        #    result.strategy = HookStrategy.MODIFY
+        #    result.updates = updates # Assign the modified container back
+        pass
 
 Message Sending Hook
 This hook is specifically for intercepting messages being sent by the user.
-def on_send_message_hook(self, account: int, params: Any) -> HookResult:
-# Called when a message is about to be sent by the client
-# params is an object (SendMessagesHelper.SendMessageParams) containing message details
-result = HookResult()
-if hasattr(params, 'message') and isinstance(params.message, str):
-    self.log(f"Intercepted on_send_message_hook for message: {params.message[:30]}")
-    # Example: Modify message parameters
-    # if params.message.startswith(".shrug"):
-    #     params.message = params.message.replace(".shrug", "¯\\_(ツ)_/¯")
-    #     result.strategy = HookStrategy.MODIFY
-    #     result.params = params # Assign the modified params object back
-    pass
 
-return result
+
+def on_send_message_hook(self, account: int, params: Any) -> HookResult:
+    # Called when a message is about to be sent by the client
+    # `params` is an object (SendMessagesHelper.SendMessageParams) containing message details
+    result = HookResult()
+ 
+    if hasattr(params, 'message') and isinstance(params.message, str):
+        self.log(f"Intercepted on_send_message_hook for message: {params.message[:30]}")
+        # Example: Modify message parameters
+        # if params.message.startswith(".shrug"):
+        #     params.message = params.message.replace(".shrug", "¯\\_(ツ)_/¯")
+        #     result.strategy = HookStrategy.MODIFY
+        #     result.params = params # Assign the modified params object back
+        pass
+ 
+    return result
+
 
 Plugin Settings
 Learn how to create a settings screen for your plugin.
+
 You can create a settings screen for your plugin by implementing the create_settings method. This method should return a list of setting control objects, which are Python dataclasses imported from the ui.settings module.
+
 General Example
 Here is a general example that demonstrates how to use all available setting controls.
 from ui.settings import Header, Input, Divider, Switch, Selector, Text, EditText
 from android.view import View
 from typing import List, Any
+ 
 class MyPlugin(BasePlugin):
-def _on_test_switch_change(self, new_value: bool):
-self.log(f"Test switch changed to: {new_value}")
-def _on_test_input_change(self, new_value: str):
-    self.log(f"Test input changed to: {new_value}")
+    def _on_test_switch_change(self, new_value: bool):
+        self.log(f"Test switch changed to: {new_value}")
+ 
+    def _on_test_input_change(self, new_value: str):
+        self.log(f"Test input changed to: {new_value}")
+ 
+    def _on_test_selector_change(self, new_index: int):
+        self.log(f"Test selector changed to index: {new_index}")
+ 
+    def _on_text_click(self, view: View):
+        self.log("Text item clicked!")
+ 
+    def _create_sub_page(self) -> List[Any]:
+        return [
+            Header(text="This is a Sub-Page"),
+            Text(text="You can nest settings pages.")
+        ]
+ 
+    def create_settings(self) -> List[Any]:
+        return [
+            Header(text="General Settings"),
+            Switch(
+                key="test_switch_key",
+                text="Test Switch",
+                default=True,
+                subtext="This is a sample switch control.",
+                icon="msg_settings",
+                on_change=self._on_test_switch_change,
+                link_alias="test_switch"
+            ),
+            Selector(
+                key="test_selector_key",
+                text="Test Selector",
+                default=1,
+                items=["Option A", "Option B", "Option C"],
+                icon="msg_list",
+                on_change=self._on_test_selector_change
+            ),
+            Divider(),
+            Header(text="Advanced Settings"),
+            Input(
+                key="test_input_key",
+                text="Test Input",
+                default="Hello, World!",
+                subtext="A simple text input field.",
+                icon="msg_text",
+                on_change=self._on_test_input_change
+            ),
+            EditText(
+                key="multiline_key",
+                hint="Enter multiple lines of text here...",
+                default="",
+                multiline=True,
+                max_length=1000
+            ),
+            Divider(text="This is a divider with text."),
+            Text(
+                text="Click for Sub-Page",
+                icon="msg_arrow_forward",
+                on_click=self._on_text_click,
+                create_sub_fragment=self._create_sub_page,
+                link_alias="sub_page_link"
+            ),
+            Text(
+                text="This is red text",
+                icon="msg_error",
+                red=True
+            )
+        ]
 
-def _on_test_selector_change(self, new_index: int):
-    self.log(f"Test selector changed to index: {new_index}")
-
-def _on_text_click(self, view: View):
-    self.log("Text item clicked!")
-
-def _create_sub_page(self) -> List[Any]:
-    return [
-        Header(text="This is a Sub-Page"),
-        Text(text="You can nest settings pages.")
-    ]
-
-def create_settings(self) -> List[Any]:
-    return [
-        Header(text="General Settings"),
-        Switch(
-            key="test_switch_key",
-            text="Test Switch",
-            default=True,
-            subtext="This is a sample switch control.",
-            icon="msg_settings",
-            on_change=self._on_test_switch_change,
-            link_alias="test_switch"
-        ),
-        Selector(
-            key="test_selector_key",
-            text="Test Selector",
-            default=1,
-            items=["Option A", "Option B", "Option C"],
-            icon="msg_list",
-            on_change=self._on_test_selector_change
-        ),
-        Divider(),
-        Header(text="Advanced Settings"),
-        Input(
-            key="test_input_key",
-            text="Test Input",
-            default="Hello, World!",
-            subtext="A simple text input field.",
-            icon="msg_text",
-            on_change=self._on_test_input_change
-        ),
-        EditText(
-            key="multiline_key",
-            hint="Enter multiple lines of text here...",
-            default="",
-            multiline=True,
-            max_length=1000
-        ),
-        Divider(text="This is a divider with text."),
-        Text(
-            text="Click for Sub-Page",
-            icon="msg_arrow_forward",
-            on_click=self._on_text_click,
-            create_sub_fragment=self._create_sub_page,
-            link_alias="sub_page_link"
-        ),
-        Text(
-            text="This is red text",
-            icon="msg_error",
-            red=True
-        )
-    ]
 
 Accessing and Modifying Settings
 To access settings from your code, use the self.get_setting("KEY", DEFAULT_VALUE) method:
-Get the value of 'test_switch_key', defaulting to False if not set
+
+
+# Get the value of 'test_switch_key', defaulting to False if not set
 is_enabled = self.get_setting("test_switch_key", False)
 To save or update a setting's value programmatically, use the self.set_setting() method:
-Get the value of 'test_switch_key', defaulting to False if not set
+# Get the value of 'test_switch_key', defaulting to False if not set
 is_enabled = self.get_setting("test_switch_key", False)
 To save or update a setting's value programmatically, use the self.set_setting() method:
-Example: Toggle a boolean setting
+
+
+# Example: Toggle a boolean setting
 current_value = self.get_setting("test_switch_key", False)
 self.set_setting("test_switch_key", not current_value)
-You can also force the settings page to reload after changing a value.
-This is useful if changing one setting should affect another's visibility or options.
+ 
+# You can also force the settings page to reload after changing a value.
+# This is useful if changing one setting should affect another's visibility or options.
 self.set_setting("main_option", "A", reload_settings=True)
 The set_setting method will persist the new value. If reload_settings is set to True, the settings UI will be completely rebuilt.
+
 You can also export all settings for a plugin to a dictionary or import them from a dictionary. This can be useful for backup/restore functionality.
-Export all settings for the current plugin to a dictionary
+
+
+# Export all settings for the current plugin to a dictionary
 all_my_settings = self.export_settings()
 self.log(f"My settings: {all_my_settings}")
-Example: Import settings from a dictionary
-This will overwrite existing settings for the plugin
+ 
+# Example: Import settings from a dictionary
+# This will overwrite existing settings for the plugin
 new_settings = {"test_switch_key": False, "test_input_key": "New Value"}
 self.import_settings(new_settings)
-By default, the settings UI will reload after an import.
-To prevent this, pass reload_settings=False
+ 
+# By default, the settings UI will reload after an import.
+# To prevent this, pass `reload_settings=False`
 self.import_settings(new_settings, reload_settings=False)
+
 Supported Controls
 Here is a summary of the available setting controls and their parameters.
+
 Control	key	text	default	Other Important Parameters
 Header	-	Required	-	text: The title of the section.
 Divider	-	-	-	text: (Optional) A note displayed on the divider line.
@@ -478,6 +589,7 @@ Selector	Required	Required	Required (int index)	items: List[str], icon: str, on_
 Input	Required	Required	(Optional) str	subtext: str, icon: str, on_change(str), on_long_click(View), link_alias: str
 Text	-	Required	-	icon: str, accent: bool, red: bool, on_click(View), create_sub_fragment() -> List, on_long_click(View), link_alias: str
 EditText	Required	-	(Optional) str	hint: str, multiline: bool, max_length: int, mask: str (regex), on_change(str)
+
 parameter details:
 Parameter	Type	Description
 key	str	Required for stateful controls. A unique string to identify the setting. This key is used with get_setting() and set_setting() to manage its value.
@@ -498,30 +610,40 @@ multiline	bool	Optional. Used with EditText. If True, allows the text field to h
 max_length	int	Optional. Used with EditText. The maximum number of characters allowed in the input.
 mask	str	Optional. Used with EditText. A regex pattern to filter input characters (e.g., "[0-9]" would only allow digits).
 exteraGram
+
 Toggle Sidebar
 On this page
- * Find the Target Method or Constructor
-   Xposed Method Hooking
-   Xposed method hooking to intercept and modify app behavior in your plugins.
+1. Find the Target Method or Constructor
+Xposed Method Hooking
+Xposed method hooking to intercept and modify app behavior in your plugins.
+
 Introduction
 Xposed method hooking allows your plugin to intercept calls to methods (or constructors) within the application, modify their parameters, change their behavior, or replace their implementation entirely. This is a powerful technique for altering app functionality at a low level.
+
 Hooking Concepts
 To hook a method, you need to provide a "hook handler" — a Python class that defines what code to run when the target method is called. The system supports three main ways to interact with a method call.
+
 The Hook Handler Base Classes
 For clarity and correctness, you should create your handler by inheriting from one of the abstract base classes provided in base_plugin.py:
+
 MethodHook: Use this when you want to run code before and/or after the original method executes, but still allow the original method to run.
 MethodReplacement: Use this when you want to completely replace the original method's logic with your own.
 The param Object
 All hook callback methods receive a param object (de.robv.android.xposed.XC_MethodHook.MethodHookParam) which is your key to interacting with the method call:
+
 param.thisObject: The instance on which the method was called (None for static methods).
 param.args: A list-like object of the arguments passed to the method. You can read and modify these. Changes made in before_hooked_method will affect the original call.
 param.getResult(): The value returned by the original method. Available in after_hooked_method. You can read and modify this.
 param.method: A java.lang.reflect.Member object representing the hooked method or constructor.
 A special and very useful feature is param.setResult(new_result). If you set this in before_hooked_method, the original method and any after_hooked_method logic will be skipped entirely. If you want (and it is possible) for the method to return a null result, do param.setResult(None).
+
 Reference: LSPosed XC_MethodHook.java
+
 Filters
 You can set filters to control whether your hook callback methods execute. You use filters by applying the @hook_filters decorator to your before_hooked_method or after_hooked_method.
+
 base_plugin.HookFilter:
+
 RESULT_IS_NULL: check if the result is null.
 RESULT_IS_TRUE: check if the result is true.
 RESULT_IS_FALSE: check if the result is false.
@@ -539,198 +661,222 @@ ArgumentNotEqual(index, value): check if !param.args[index].equals(value).
 Condition(condition, object: Any = None): A MVEL expression. (e.g., "param.args[0] == 1" or "param.args[0] == object" if object is provided to filter function)
 Or(*filters): check if at least one of the filters is true.
 Examples of usage filters
+
 from base_plugin import MethodHook, hook_filters, HookFilter
+ 
 class Example1(MethodHook):
-# Run before_hooked_method only if first argument is null
-@hook_filters(HookFilter.ArgumentIsNull(0))
-def before_hooked_method(self, param):
-...
-# Run `after_hooked_method` only if result of original method is null
-@hook_filters(HookFilter.RESULT_IS_NULL)
-def after_hooked_method(self, param):
-    ...
-
+    # Run `before_hooked_method` only if first argument is null
+    @hook_filters(HookFilter.ArgumentIsNull(0))
+    def before_hooked_method(self, param):
+        ...
+    
+    # Run `after_hooked_method` only if result of original method is null
+    @hook_filters(HookFilter.RESULT_IS_NULL)
+    def after_hooked_method(self, param):
+        ...
+ 
 class Example2(MethodHook):
-# Run before_hooked_method only if first argument is string "TEST" or second argument is true
-@hook_filters(HookFilter.Or(HookFilter.ArgumentEqual(0, "TEST"), HookFilter.ArgumentIsTrue(1)))
-def before_hooked_method(self, param):
-...
-    # you can change arguments to your value
-    param.args[0] = "EDITED_VALUE"
-
-# Run `after_hooked_method` only if result of original method != null and first arg is edited
-@hook_filters(HookFilter.RESULT_IS_NOT_NULL, HookFilter.ArgumentEqual(0, "EDITED_VALUE"))
-def after_hooked_method(self, param):
-    ...
-
+    # Run `before_hooked_method` only if first argument is string "TEST" or second argument is true
+    @hook_filters(HookFilter.Or(HookFilter.ArgumentEqual(0, "TEST"), HookFilter.ArgumentIsTrue(1)))
+    def before_hooked_method(self, param):
+        ...
+ 
+        # you can change arguments to your value
+        param.args[0] = "EDITED_VALUE"
+    
+    # Run `after_hooked_method` only if result of original method != null and first arg is edited
+    @hook_filters(HookFilter.RESULT_IS_NOT_NULL, HookFilter.ArgumentEqual(0, "EDITED_VALUE"))
+    def after_hooked_method(self, param):
+        ...
+ 
+ 
 class Example3(MethodHook):
-# Run before_hooked_method only if condition is true
-@hook_filters(HookFilter.Condition(
-"this.attr1 == object || param.args[1] == "ok"" # this = param.thisObject
-" || param.args[1] instanceof java.nio.ByteBuffer",
-object=500
-))
-def before_hooked_method(self, param):
-...
-# Run `after_hooked_method` only if condition is true
-@hook_filters(HookFilter.Condition( # check currect account has premium and class' private value equals value of plugin setting)
-    "org.telegram.messenger.AccountInstance.getInstance(org.telegram.messenger.UserConfig.selectedAccount).getUserConfig().isPremium()"
-    " || com.exteragram.messenger.utils.AppUtils.getPrivateField(this, \"target_field\") == "
-    "com.exteragram.messenger.plugins.PluginsController.getInstance().getPluginSettingString(\"plugin_id\", \"setting_key\", \"default_value\")"
-))
-def after_hooked_method(self, param):
-    ...
-
+    # Run `before_hooked_method` only if condition is true
+    @hook_filters(HookFilter.Condition(
+        "this.attr1 == object || param.args[1] == \"ok\"" # this = param.thisObject
+        " || param.args[1] instanceof java.nio.ByteBuffer",
+        object=500
+    ))
+    def before_hooked_method(self, param):
+        ...
+    
+    # Run `after_hooked_method` only if condition is true
+    @hook_filters(HookFilter.Condition( # check currect account has premium and class' private value equals value of plugin setting)
+        "org.telegram.messenger.AccountInstance.getInstance(org.telegram.messenger.UserConfig.selectedAccount).getUserConfig().isPremium()"
+        " || com.exteragram.messenger.utils.AppUtils.getPrivateField(this, \"target_field\") == "
+        "com.exteragram.messenger.plugins.PluginsController.getInstance().getPluginSettingString(\"plugin_id\", \"setting_key\", \"default_value\")"
+    ))
+    def after_hooked_method(self, param):
+        ...
 The Hooking Process (Step-by-Step)
- * Find the Target Method or Constructor
-   First, you need a reference to the java.lang.reflect.Method or java.lang.reflect.Constructor you want to hook. This is done using Java reflection.
-   from hook_utils import find_class
-Use find_class for safety. It returns None if the class is not found.
+1. Find the Target Method or Constructor
+First, you need a reference to the java.lang.reflect.Method or java.lang.reflect.Constructor you want to hook. This is done using Java reflection.
+from hook_utils import find_class
+ 
+# Use find_class for safety. It returns None if the class is not found.
 ActionBarClass = find_class("org.telegram.ui.ActionBar.ActionBar")
 if not ActionBarClass:
-self.log("ActionBar class not found!")
-return
---- Finding a Method ---
-Example: public void setTitle(CharSequence title)
+    self.log("ActionBar class not found!")
+    return
+ 
+# --- Finding a Method ---
+# Example: public void setTitle(CharSequence title)
 try:
-# Get the class for the parameter type
-CharSequenceClass = find_class("java.lang.CharSequence")
-# Get the method
-method_to_hook = ActionBarClass.getClass().getDeclaredMethod("setTitle", CharSequenceClass)
-method_to_hook.setAccessible(True)  # Important for non-public methods
+    # Get the class for the parameter type
+    CharSequenceClass = find_class("java.lang.CharSequence")
+    # Get the method
+    method_to_hook = ActionBarClass.getClass().getDeclaredMethod("setTitle", CharSequenceClass)
+    method_to_hook.setAccessible(True)  # Important for non-public methods
 except Exception as e:
-self.log(f"Failed to find method 'setTitle': {e}")
---- Finding a Constructor ---
-Example: public ActionBar(Context context)
+    self.log(f"Failed to find method 'setTitle': {e}")
+ 
+# --- Finding a Constructor ---
+# Example: public ActionBar(Context context)
 try:
-ContextClass = find_class("android.content.Context")
-constructor_to_hook = ActionBarClass.getClass().getDeclaredConstructor(ContextClass)
-constructor_to_hook.setAccessible(True) # Important for non-public constructors
+    ContextClass = find_class("android.content.Context")
+    constructor_to_hook = ActionBarClass.getClass().getDeclaredConstructor(ContextClass)
+    constructor_to_hook.setAccessible(True) # Important for non-public constructors
 except Exception as e:
-self.log(f"Failed to find constructor: {e}")
+    self.log(f"Failed to find constructor: {e}")
 2. Implement the Hook Handler
 Create a Python class that inherits from MethodHook or MethodReplacement and implements the required callback(s).
+
+
 from base_plugin import MethodHook, MethodReplacement
-For running code before/after the original method
+ 
+# For running code before/after the original method
 class TitleLoggerHook(MethodHook):
-def init(self, plugin):
-self.plugin = plugin # Pass your plugin instance for logging, etc.
-def before_hooked_method(self, param):
-    title = param.args[0]
-    self.plugin.log(f"ActionBar title is being set to: {title}")
-    # Let's add a prefix to every title
-    param.args[0] = f"[Hooked] {title}"
-
-def after_hooked_method(self, param):
-    self.plugin.log(f"ActionBar title has been set.")
-
-For completely replacing the original method
+    def __init__(self, plugin):
+        self.plugin = plugin # Pass your plugin instance for logging, etc.
+ 
+    def before_hooked_method(self, param):
+        title = param.args[0]
+        self.plugin.log(f"ActionBar title is being set to: {title}")
+        # Let's add a prefix to every title
+        param.args[0] = f"[Hooked] {title}"
+ 
+    def after_hooked_method(self, param):
+        self.plugin.log(f"ActionBar title has been set.")
+ 
+ 
+# For completely replacing the original method
 class TitleReplacer(MethodReplacement):
-def init(self, plugin):
-self.plugin = plugin
-def replace_hooked_method(self, param):
-    self.plugin.log("ActionBar.setTitle() was called, but we are blocking it.")
-    # The original method is NOT called.
-    # Since the original method returns void, we don't need to return anything.
-    return None
+    def __init__(self, plugin):
+        self.plugin = plugin
+ 
+    def replace_hooked_method(self, param):
+        self.plugin.log("ActionBar.setTitle() was called, but we are blocking it.")
+        # The original method is NOT called.
+        # Since the original method returns void, we don't need to return anything.
+        return None
+3. Apply the Hook
+From your BasePlugin class, instantiate your handler and call self.hook_method().
 
- * Apply the Hook
-   From your BasePlugin class, instantiate your handler and call self.hook_method().
-In your on_plugin_load method or another appropriate place:
-Get the method to hook (as shown in Step 1)
+
+# In your on_plugin_load method or another appropriate place:
+ 
+# Get the method to hook (as shown in Step 1)
 try:
-ActionBarClass = find_class("org.telegram.ui.ActionBar.ActionBar")
-CharSequenceClass = find_class("java.lang.CharSequence")
-set_title_method = ActionBarClass.getClass().getDeclaredMethod("setTitle", CharSequenceClass)
-# Instantiate your handler and apply the hook
-handler_instance = TitleLoggerHook(self)
-self.unhook_obj = self.hook_method(set_title_method, handler_instance, priority=10)
-
-if self.unhook_obj:
-    self.log("Successfully hooked ActionBar.setTitle()")
-else:
-    self.log("Failed to hook ActionBar.setTitle()")
-
+    ActionBarClass = find_class("org.telegram.ui.ActionBar.ActionBar")
+    CharSequenceClass = find_class("java.lang.CharSequence")
+    set_title_method = ActionBarClass.getClass().getDeclaredMethod("setTitle", CharSequenceClass)
+ 
+    # Instantiate your handler and apply the hook
+    handler_instance = TitleLoggerHook(self)
+    self.unhook_obj = self.hook_method(set_title_method, handler_instance, priority=10)
+ 
+    if self.unhook_obj:
+        self.log("Successfully hooked ActionBar.setTitle()")
+    else:
+        self.log("Failed to hook ActionBar.setTitle()")
+ 
 except Exception as e:
-self.log(f"Error during hooking setup: {e}")
-Hooks are automatically removed when your plugin is unloaded.
-If you need to remove a hook manually, you can use the returned object:
-if self.unhook_obj:
-self.unhook_method(self.unhook_obj)
- * Hooking Multiple Methods/Constructors
-   If you need to apply the same hook to all methods with a specific name within a class, or to all of a class's constructors, you can use these convenient helper methods.
+    self.log(f"Error during hooking setup: {e}")
+ 
+# Hooks are automatically removed when your plugin is unloaded.
+# If you need to remove a hook manually, you can use the returned object:
+# if self.unhook_obj:
+#   self.unhook_method(self.unhook_obj)
+4. Hooking Multiple Methods/Constructors
+If you need to apply the same hook to all methods with a specific name within a class, or to all of a class's constructors, you can use these convenient helper methods.
+
 self.hook_all_methods(hook_class, method_name, xposed_hook, priority): Hooks all methods with the given method_name in hook_class.
 self.hook_all_constructors(hook_class, xposed_hook, priority): Hooks all constructors in hook_class.
 These methods return a list of Unhook objects, one for each method/constructor that was hooked.
-Example: Hook all methods named "onMeasure" in a custom View class
+
+
+# Example: Hook all methods named "onMeasure" in a custom View class
 try:
-MyViewClass = find_class("com.example.MyCustomView")
-on_measure_handler = MyOnMeasureHook(self)
-unhook_list = self.hook_all_methods(MyViewClass, "onMeasure", on_measure_handler)
-if unhook_list:
-self.log(f"Successfully hooked {len(unhook_list)} 'onMeasure' methods.")
+    MyViewClass = find_class("com.example.MyCustomView")
+    on_measure_handler = MyOnMeasureHook(self)
+    unhook_list = self.hook_all_methods(MyViewClass, "onMeasure", on_measure_handler)
+    if unhook_list:
+        self.log(f"Successfully hooked {len(unhook_list)} 'onMeasure' methods.")
 except Exception as e:
-self.log(f"Failed to hook 'onMeasure' methods: {e}")
+    self.log(f"Failed to hook 'onMeasure' methods: {e}")
 5. Unhooking Methods
 Hooks are automatically removed when your plugin is disabled or unloaded. However, if you need to remove a hook manually, you can call self.unhook_method() and pass it the Unhook object that was returned by the original hook_method() call.
-In your on_plugin_load:
-... (find method_to_hook) ...
-self.my_unhook_object = self.hook_method(method_to_hook, handler)
-Later, in your plugin's logic (e.g., in response to a setting change):
+
+
+# In your on_plugin_load:
+# ... (find method_to_hook) ...
+# self.my_unhook_object = self.hook_method(method_to_hook, handler)
+ 
+# Later, in your plugin's logic (e.g., in response to a setting change):
 if self.my_unhook_object:
-self.unhook_method(self.my_unhook_object)
-self.log("Manually unhooked the method.")
-self.my_unhook_object = None
+    self.unhook_method(self.my_unhook_object)
+    self.log("Manually unhooked the method.")
+    self.my_unhook_object = None
 If you used hook_all_methods or hook_all_constructors, you would iterate through the returned list and call unhook_method for each item if you need to manually unhook them.
+
 Practical Examples
 Example 1: Modifying Arguments (Before Hook)
 Let's modify every "Toast" message to add a prefix.
+
+
 from base_plugin import MethodHook
 from hook_utils import find_class
 from java import jint
+ 
 class ToastHook(MethodHook):
-def before_hooked_method(self, param):
-# Method signature: makeText(Context context, CharSequence text, int duration)
-original_text = param.args[1]
-param.args[1] = f"(Plugin) {original_text}"
-In your plugin's on_plugin_load:
+    def before_hooked_method(self, param):
+        # Method signature: makeText(Context context, CharSequence text, int duration)
+        original_text = param.args[1]
+        param.args[1] = f"(Plugin) {original_text}"
+ 
+# In your plugin's on_plugin_load:
 try:
-ToastClass = find_class("android.widget.Toast")
-ContextClass = find_class("android.content.Context")
-CharSequenceClass = find_class("java.lang.CharSequence")
-make_text_method = ToastClass.getClass().getDeclaredMethod(
-    "makeText", ContextClass, CharSequenceClass, jint
-)
-self.hook_method(make_text_method, ToastHook())
-self.log("Hooked Toast.makeText() successfully.")
-
+    ToastClass = find_class("android.widget.Toast")
+    ContextClass = find_class("android.content.Context")
+    CharSequenceClass = find_class("java.lang.CharSequence")
+ 
+    make_text_method = ToastClass.getClass().getDeclaredMethod(
+        "makeText", ContextClass, CharSequenceClass, jint
+    )
+    self.hook_method(make_text_method, ToastHook())
+    self.log("Hooked Toast.makeText() successfully.")
 except Exception as e:
-self.log(f"Failed to hook Toast: {e}")
+    self.log(f"Failed to hook Toast: {e}")
 Example 2: Changing the Return Value (After Hook)
 This example hooks BuildVars.isMainApp() and makes it always return False.
+
+
 from base_plugin import MethodHook
 from hook_utils import find_class
+ 
 class BuildVarsHook(MethodHook):
-def after_hooked_method(self, param):
-# Original result is in param.getResult(), let's change it
-original_result = param.getResult()
-    # You can pass any value you want here
-    param.setResult(False)
-
-In your plugin's on_plugin_load:
+    def after_hooked_method(self, param):
+        # Original result is in param.getResult(), let's change it
+        original_result = param.getResult()
+ 
+        # You can pass any value you want here
+        param.setResult(False)
+ 
+# In your plugin's on_plugin_load:
 try:
-BuildVarsClass = find_class("org.telegram.messenger.BuildVars")
-is_main_app_method = BuildVarsClass.getClass().getDeclaredMethod("isMainApp")
-self.hook_method(is_main_app_method, BuildVarsHook())
-self.log("Hooked BuildVars.isMainApp() successfully.")
+    BuildVarsClass = find_class("org.telegram.messenger.BuildVars")
+    is_main_app_method = BuildVarsClass.getClass().getDeclaredMethod("isMainApp")
+    self.hook_method(is_main_app_method, BuildVarsHook())
+    self.log("Hooked BuildVars.isMainApp() successfully.")
 except Exception as e:
-self.log(f"Failed to hook BuildVars: {e}")
-
-""
-s: {e}")
-"""
-Hook())
-self.log("Hooked BuildVars.isMainApp() successfully.")
-except Exception as e:
-self.log(f"Failed to hook BuildVars: {e}")
-"""
+    self.log(f"Failed to hook BuildVars: {e}")
